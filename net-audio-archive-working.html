@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NET Onchain Audio Archive</title>
+    
+    <!-- Import wagmi, viem, and other dependencies via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/viem@2.7.0/dist/viem.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 2px solid #00ff00;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: #00ff00;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1em;
+        }
+
+        .network-badge {
+            display: inline-block;
+            background: #2a2a2a;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 15px;
+            border: 1px solid #00ff00;
+            font-size: 0.9em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #333;
+        }
+
+        .tab-button {
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border: none;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            border-top: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-button:hover {
+            background: #333;
+            color: #00ff00;
+        }
+
+        .tab-button.active {
+            border-top-color: #00ff00;
+            background: #333;
+            color: #00ff00;
+        }
+
+        .recordings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .recording-card {
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .recording-card:hover {
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
+
+        .recording-card h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .recording-info {
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .recording-info div {
+            margin-bottom: 5px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+            filter: brightness(0.8) contrast(1.2);
+        }
+
+        .net-link {
+            font-size: 0.8em;
+            color: #666;
+            word-break: break-all;
+            margin-top: 10px;
+            padding: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+
+        .net-link a {
+            color: #00ff00;
+            text-decoration: none;
+        }
+
+        .button {
+            background: #00ff00;
+            color: #1a1a1a;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            border-radius: 4px;
+            transition: all 0.3s;
+            font-size: 1em;
+        }
+
+        .button:hover {
+            background: #00cc00;
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        .button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .upload-container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .wallet-status {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .wallet-status.connected {
+            border: 2px solid #00ff00;
+        }
+
+        .wallet-status.disconnected {
+            border: 2px solid #ff6b6b;
+        }
+
+        .wallet-address {
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #00ff00;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            background: #1a1a1a;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            border-radius: 4px;
+        }
+
+        .form-helper {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .file-upload-area {
+            border: 2px dashed #555;
+            padding: 30px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-upload-area:hover {
+            border-color: #00ff00;
+            background: #0a0a0a;
+        }
+
+        .file-selected {
+            color: #00ff00;
+            margin-top: 10px;
+        }
+
+        .upload-progress {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #1a1a1a;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1a1a1a;
+            font-weight: bold;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .status-message.success {
+            background: #00ff0020;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+
+        .status-message.error {
+            background: #ff6b6b20;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .info-box {
+            background: #1a1a1a;
+            padding: 20px;
+            border-left: 4px solid #00ff00;
+            margin-top: 30px;
+            border-radius: 4px;
+        }
+
+        .info-box h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 NET ONCHAIN AUDIO ARCHIVE</h1>
+            <p class="subtitle">Decentralized Audio Storage on NET Protocol</p>
+            <div class="network-badge">
+                ⚡ Base (Chain ID: 8453) | Powered by NET Protocol
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('browse')">Browse Audio</button>
+            <button class="tab-button" onclick="switchTab('upload')">Upload Audio</button>
+            <button class="tab-button" onclick="switchTab('technical')">Technical</button>
+        </div>
+
+        <!-- BROWSE TAB -->
+        <div id="browse-tab" class="tab-content active">
+            <div class="recordings-grid" id="recordings-container">
+                <!-- Sample recordings -->
+                <div class="recording-card">
+                    <h3>Sally Gooden</h3>
+                    <div class="recording-info">
+                        <div><strong>Creator:</strong> Traditional</div>
+                        <div><strong>Category:</strong> music</div>
+                        <div style="margin-top: 10px; font-style: italic;">Classic fiddle tune</div>
+                    </div>
+                    <audio controls>
+                        <source src="https://storedon.net/net/8453/storage/load/0x7Ff446Ecf4A6C7224264eab1Ee97e26A1D71152D/Sally%20Gooden" type="audio/mpeg">
+                    </audio>
+                    <div class="net-link">
+                        🔗 NET URL: <a href="https://storedon.net/net/8453/storage/load/0x7Ff446Ecf4A6C7224264eab1Ee97e26A1D71152D/Sally%20Gooden" target="_blank">View on NET Gateway</a>
+                    </div>
+                </div>
+
+                <div class="recording-card">
+                    <h3>Martha Campbell</h3>
+                    <div class="recording-info">
+                        <div><strong>Creator:</strong> Traditional</div>
+                        <div><strong>Category:</strong> music</div>
+                        <div style="margin-top: 10px; font-style: italic;">Traditional tune</div>
+                    </div>
+                    <audio controls>
+                        <source src="https://storedon.net/net/8453/storage/load/0x7Ff446Ecf4A6C7224264eab1Ee97e26A1D71152D/Martha%20Campbell" type="audio/mpeg">
+                    </audio>
+                    <div class="net-link">
+                        🔗 NET URL: <a href="https://storedon.net/net/8453/storage/load/0x7Ff446Ecf4A6C7224264eab1Ee97e26A1D71152D/Martha%20Campbell" target="_blank">View on NET Gateway</a>
+                    </div>
+                </div>
+
+                <div class="recording-card">
+                    <h3>Seneca Square Dance</h3>
+                    <div class="recording-info">
+                        <div><strong>Creator:</strong> Traditional</div>
+                        <div><strong>Category:</strong> music</div>
+                        <div style="margin-top: 10px; font-style: italic;">Traditional dance tune</div>
+                    </div>
+                    <audio controls>
+                        <source src="https://storedon.net/net/8453/storage/load/0x7Ff446Ecf4A6C7224264eab1Ee97e26A1D71152D/Seneca%20Square%20Dance" type="audio/mpeg">
+                    </audio>
+                    <div class="net-link">
+                        🔗 NET URL: <a href="https://storedon.net/net/8453/storage/load/0x7Ff446Ecf4A6C7224264eab1Ee97e26A1D71152D/Seneca%20Square%20Dance" target="_blank">View on NET Gateway</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UPLOAD TAB -->
+        <div id="upload-tab" class="tab-content">
+            <div class="upload-container">
+                <h2 style="color: #00ff00; margin-bottom: 20px; text-align: center;">Upload Your Audio</h2>
+
+                <!-- Wallet Status -->
+                <div id="wallet-status" class="wallet-status disconnected">
+                    <div id="wallet-message">
+                        <strong>⚠️ Wallet Not Connected</strong>
+                        <p>Connect your wallet to upload audio to NET Protocol</p>
+                        <button class="button" onclick="connectWallet()" style="margin-top: 15px;">
+                            Connect Wallet
+                        </button>
+                    </div>
+                    <div id="wallet-connected" style="display: none;">
+                        <strong>✓ Wallet Connected</strong>
+                        <div class="wallet-address" id="connected-address"></div>
+                        <div style="margin-top: 10px; font-size: 0.9em; color: #888;">
+                            Network: Base (8453)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Form -->
+                <form id="upload-form" style="display: none;" onsubmit="handleUpload(event)">
+                    <div class="form-group">
+                        <label>Storage Key *</label>
+                        <input type="text" id="storage-key" required placeholder="e.g., my-audio-2024">
+                        <div class="form-helper">
+                            Unique identifier (lowercase, dashes allowed)
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Title *</label>
+                        <input type="text" id="title" required placeholder="e.g., My Audio Recording">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Creator/Artist *</label>
+                        <input type="text" id="creator" required placeholder="e.g., John Doe">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Year</label>
+                        <input type="number" id="year" placeholder="e.g., 2024">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="category">
+                            <option value="music">Music</option>
+                            <option value="podcast">Podcast</option>
+                            <option value="audiobook">Audiobook</option>
+                            <option value="field-recording">Field Recording</option>
+                            <option value="spoken-word">Spoken Word</option>
+                            <option value="sound-effects">Sound Effects</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="description" placeholder="Additional information..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Audio File *</label>
+                        <div class="file-upload-area" onclick="document.getElementById('audio-file').click()">
+                            <p>📁 Click to select audio file</p>
+                            <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+                                Supported: MP3, WAV, OGG, FLAC
+                            </p>
+                            <input type="file" id="audio-file" accept="audio/*" style="display: none;" onchange="handleFileSelect()" required>
+                            <div id="file-selected" class="file-selected"></div>
+                        </div>
+                    </div>
+
+                    <div class="upload-progress" id="upload-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill">0%</div>
+                        </div>
+                        <p id="upload-status" style="text-align: center; color: #888;"></p>
+                    </div>
+
+                    <button type="submit" class="button" style="width: 100%; margin-top: 20px;">
+                        📤 Upload to NET Protocol
+                    </button>
+                </form>
+
+                <div id="status-message" class="status-message" style="display: none;"></div>
+
+                <div class="info-box">
+                    <h3>How Upload Works</h3>
+                    <ul style="list-style-position: inside; color: #888;">
+                        <li>Connect your Web3 wallet (MetaMask, Rainbow, etc.)</li>
+                        <li>Fill out audio metadata</li>
+                        <li>Select your audio file</li>
+                        <li>Confirm transaction in your wallet</li>
+                        <li>File gets permanently stored on Base blockchain</li>
+                        <li>Receive permanent NET Gateway URL</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TECHNICAL TAB -->
+        <div id="technical-tab" class="tab-content">
+            <div class="upload-container" style="max-width: 900px;">
+                <h2 style="color: #00ff00; margin-bottom: 20px;">Technical Details</h2>
+                
+                <h3 style="color: #00ff00; margin-top: 30px; margin-bottom: 15px;">How It Works</h3>
+                <p style="color: #888; margin-bottom: 15px;">
+                    This archive uses NET Protocol's onchain storage system to permanently store audio files on the Base blockchain.
+                </p>
+
+                <div style="background: #1a1a1a; padding: 15px; border-radius: 4px; margin: 15px 0;">
+                    <p style="color: #00ff00; margin-bottom: 10px;"><strong>Storage Flow:</strong></p>
+                    <ol style="color: #888; padding-left: 20px;">
+                        <li>Audio file is read and converted to base64</li>
+                        <li>Metadata is packaged with the audio data</li>
+                        <li>Data is stored via NET Protocol storage contract</li>
+                        <li>Transaction is confirmed on Base blockchain</li>
+                        <li>File becomes accessible via NET Gateway CDN</li>
+                    </ol>
+                </div>
+
+                <h3 style="color: #00ff00; margin-top: 30px; margin-bottom: 15px;">NET Protocol Contract</h3>
+                <div style="background: #1a1a1a; padding: 15px; border-radius: 4px;">
+                    <p style="color: #888;"><strong style="color: #00ff00;">Address:</strong> 0x00000000B24D62781dB359b07880a105cD0b64e6</p>
+                    <p style="color: #888;"><strong style="color: #00ff00;">Network:</strong> Base (Chain ID: 8453)</p>
+                    <p style="color: #888;"><strong style="color: #00ff00;">Gateway:</strong> storedon.net</p>
+                </div>
+
+                <div class="info-box">
+                    <h3>Resources</h3>
+                    <ul style="list-style-position: inside; color: #888;">
+                        <li><a href="https://docs.netprotocol.app" target="_blank" style="color: #00ff00;">NET Protocol Documentation</a></li>
+                        <li><a href="https://github.com/stuckinaboot/net-public" target="_blank" style="color: #00ff00;">NET Protocol SDK</a></li>
+                        <li><a href="https://storedon.net" target="_blank" style="color: #00ff00;">NET Gateway</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let provider = null;
+        let signer = null;
+        let connectedAddress = null;
+        let selectedFile = null;
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Wallet connection
+        async function connectWallet() {
+            try {
+                // Check for wallet
+                if (typeof window.ethereum === 'undefined') {
+                    showStatus('error', 'No Web3 wallet detected! Please install MetaMask, Rainbow, or another Web3 wallet.');
+                    return;
+                }
+
+                // Request account access
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+                connectedAddress = await signer.getAddress();
+
+                // Check if on Base network
+                const network = await provider.getNetwork();
+                if (network.chainId !== 8453) {
+                    // Try to switch to Base
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x2105' }], // 8453 in hex
+                        });
+                    } catch (switchError) {
+                        // Try to add Base network
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: '0x2105',
+                                    chainName: 'Base',
+                                    nativeCurrency: {
+                                        name: 'Ethereum',
+                                        symbol: 'ETH',
+                                        decimals: 18
+                                    },
+                                    rpcUrls: ['https://mainnet.base.org'],
+                                    blockExplorerUrls: ['https://basescan.org']
+                                }]
+                            });
+                        } else {
+                            throw new Error('Please switch to Base network in your wallet');
+                        }
+                    }
+                }
+
+                // Update UI
+                document.getElementById('wallet-message').style.display = 'none';
+                document.getElementById('wallet-connected').style.display = 'block';
+                document.getElementById('connected-address').textContent = connectedAddress;
+                document.getElementById('wallet-status').classList.remove('disconnected');
+                document.getElementById('wallet-status').classList.add('connected');
+                document.getElementById('upload-form').style.display = 'block';
+
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                showStatus('error', `Failed to connect wallet: ${error.message}`);
+            }
+        }
+
+        // File selection
+        function handleFileSelect() {
+            const file = document.getElementById('audio-file').files[0];
+            if (file) {
+                selectedFile = file;
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                document.getElementById('file-selected').innerHTML = `
+                    <strong>✓ Selected:</strong> ${file.name} (${fileSize} MB)
+                `;
+            }
+        }
+
+        // Upload handling
+        async function handleUpload(event) {
+            event.preventDefault();
+
+            if (!selectedFile) {
+                showStatus('error', 'Please select an audio file');
+                return;
+            }
+
+            const metadata = {
+                storageKey: document.getElementById('storage-key').value,
+                title: document.getElementById('title').value,
+                creator: document.getElementById('creator').value,
+                year: document.getElementById('year').value,
+                category: document.getElementById('category').value,
+                description: document.getElementById('description').value
+            };
+
+            // Validate storage key
+            if (!/^[a-z0-9-]+$/.test(metadata.storageKey)) {
+                showStatus('error', 'Storage key must be lowercase letters, numbers, and dashes only');
+                return;
+            }
+
+            // Show progress
+            document.getElementById('upload-progress').style.display = 'block';
+            updateProgress(10, 'Reading file data...');
+
+            try {
+                // Read file as base64
+                const fileData = await readFileAsBase64(selectedFile);
+                updateProgress(30, 'Preparing data for NET Protocol...');
+
+                // Create metadata JSON
+                const metadataJson = {
+                    title: metadata.title,
+                    creator: metadata.creator,
+                    year: metadata.year,
+                    category: metadata.category,
+                    description: metadata.description,
+                    fileName: selectedFile.name,
+                    fileType: selectedFile.type,
+                    uploadDate: new Date().toISOString()
+                };
+
+                // Combine metadata and file data
+                const combinedData = JSON.stringify({
+                    metadata: metadataJson,
+                    audioData: fileData
+                });
+
+                // Convert to bytes
+                const dataBytes = ethers.utils.toUtf8Bytes(combinedData);
+                updateProgress(50, 'Connecting to NET Protocol...');
+
+                // NET Protocol contract
+                const NET_CONTRACT_ADDRESS = '0x00000000B24D62781dB359b07880a105cD0b64e6';
+                const storageAbi = [
+                    "function put(bytes32 key, bytes calldata data, string calldata text) external"
+                ];
+
+                const contract = new ethers.Contract(NET_CONTRACT_ADDRESS, storageAbi, signer);
+
+                // Convert storage key to bytes32
+                const keyBytes32 = ethers.utils.formatBytes32String(metadata.storageKey);
+
+                updateProgress(60, 'Waiting for wallet confirmation...');
+
+                // Send transaction
+                const tx = await contract.put(
+                    keyBytes32,
+                    dataBytes,
+                    `${metadata.title} by ${metadata.creator}`
+                );
+
+                updateProgress(80, 'Transaction submitted. Waiting for confirmation...');
+
+                // Wait for transaction to be mined
+                const receipt = await tx.wait();
+
+                updateProgress(100, 'Upload complete!');
+
+                // Generate NET Gateway URL
+                const netUrl = `https://storedon.net/net/8453/storage/load/${connectedAddress}/${encodeURIComponent(metadata.storageKey)}`;
+
+                // Show success
+                showStatus('success', `
+                    ✓ Upload successful!<br><br>
+                    <strong>Transaction Hash:</strong><br>
+                    <a href="https://basescan.org/tx/${receipt.transactionHash}" target="_blank" style="color: #00ff00; word-break: break-all;">${receipt.transactionHash}</a><br><br>
+                    <strong>NET Gateway URL:</strong><br>
+                    <a href="${netUrl}" target="_blank" style="color: #00ff00; word-break: break-all;">${netUrl}</a><br><br>
+                    Your audio is now permanently stored on the blockchain!
+                `);
+
+                // Reset form
+                document.getElementById('upload-form').reset();
+                document.getElementById('file-selected').innerHTML = '';
+                selectedFile = null;
+                setTimeout(() => {
+                    document.getElementById('upload-progress').style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                showStatus('error', `Upload failed: ${error.message}`);
+                document.getElementById('upload-progress').style.display = 'none';
+            }
+        }
+
+        // Helper functions
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateProgress(percent, message) {
+            document.getElementById('progress-fill').style.width = percent + '%';
+            document.getElementById('progress-fill').textContent = percent + '%';
+            document.getElementById('upload-status').textContent = message;
+        }
+
+        function showStatus(type, message) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.className = 'status-message ' + type;
+            statusEl.innerHTML = message;
+            statusEl.style.display = 'block';
+
+            if (type === 'error') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>
